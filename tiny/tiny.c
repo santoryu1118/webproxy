@@ -88,7 +88,7 @@ void doit(int fd){
   // static(정적) 컨텐츠라면
   if (is_static){
     // 보통 파일이라는 것과 읽기 권한을 가지고 있는지 확인
-    if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)){
+    if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)){
       clienterror(fd, filename, "403", "Forbidden", 
                   "Tiny couldn't read the file");
       return;
@@ -155,7 +155,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs){
     strcpy(cgiargs, "");
     strcpy(filename, ".");
     strcat(filename, uri);
-    if (uri[strlen(uri) -1] == "/")
+    if (uri[strlen(uri) -1] == '/')
       strcat(filename, "home.html");
     return 1;
   }
@@ -197,6 +197,38 @@ void serve_static(int fd, char *filename, int filesize){
 
   /* send response headers to client */
   get_filetype(filename, filetype);
-  
+  sprintf(buf, "HTTP/1.0 200 OK\r\n");
+  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+  sprintf(buf, "%sConnection: close\r\n", buf);
+  sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
+  sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
+  Rio_writen(fd, buf, strlen(buf));
+  printf("Response headers:\n");
+  printf("%s", buf);
 
+  /* send response body to client */
+  srcfd = Open(filename, O_RDONLY, 0);
+  srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+  Close(srcfd);
+  Rio_writen(fd, srcp, filesize);
+  Munmap(srcp, filesize);
+}
+
+void serve_dynamic(int fd, char *filename, char *cgiargs){
+  char buf[MAXLINE], *emptylist[] = {NULL};
+
+  /* Return first part of HTTP response */
+  sprintf(buf, "HTTP/1.0 200 OK\r\n");
+  Rio_writen(fd, buf, strlen(buf));
+  sprintf(buf, "Server: Tiny Web Server\r\n");
+  Rio_writen(fd, buf, strlen(buf));
+
+  if (Fork() == 0){
+    setenv("QUERY_STRING", cgiargs, 1);
+    // redirect stdout to client
+    Dup2(fd, STDOUT_FILENO);  
+    // run CGI program
+    Execve(filename, emptylist, environ);
+  }
+  Wait(NULL);
 }
