@@ -37,7 +37,8 @@ int main(int argc, char **argv) {
     clientlen = sizeof(clientaddr);
 
     // accepting a connection request
-    // connfd 소켓에 clientaddr 저장
+    // connfd 연결 식별자 소켓에 clientaddr 저장
+    // int Accept(int listenfd, struct sockaddr *addr, int *addrlen);
     connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  // line:netp:tiny:accept
 
     // 클라이언트의 주소를 getnameinfo 함수에 넣어, hostname(ip주소)와 포트 번호를 얻고 프린트
@@ -69,6 +70,7 @@ void doit(int fd){
 
   // GET 요청인지 확인
   if (strcasecmp(method, "GET")){ // strcasecmp - 대소문자 구분하지 않고 스트링 비교
+                                  // 둘이 같으면 0 return
     clienterror(fd, method, "501", "Not implemented", 
         "Tiny does not implement this method");
     return;
@@ -122,7 +124,7 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longms
   /* Print the HTTP response */
   sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
   Rio_writen(fd, buf, strlen(buf));
-  sprintf(buf, "Content-type: text/html\r\n");
+  sprintf(buf, "%s Content-type: text/html\r\n");
   Rio_writen(fd, buf, strlen(buf));
   sprintf(buf, "Content-length: %d\r\n\r\n", (int)strlen(body));
   Rio_writen(fd, buf, strlen(buf));
@@ -171,7 +173,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs){
       strcpy(cgiargs, "");
 
     strcpy(filename, ".");
-    strcpy(filename, uri);
+    strcat(filename, uri);
     return 0;
   }
 }
@@ -187,6 +189,9 @@ void get_filetype(char *filename, char *filetype){
     strcpy(filetype, "image/png");
   else if (strstr(filename, ".jpg"))
     strcpy(filetype, "image.jpg");
+  // MP4 파일
+  else if (strstr(filename, ".mp4"))
+    strcpy(filetype, "video.mp4");
   else
     strcpy(filetype, "text/plain");
 }
@@ -208,10 +213,22 @@ void serve_static(int fd, char *filename, int filesize){
 
   /* send response body to client */
   srcfd = Open(filename, O_RDONLY, 0);
-  srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+  srcp = malloc(filesize);
+
+  // ssize_t rio_read(int fd, void *usrbuf, size_t n)
+  Rio_readn(srcfd, srcp, filesize);
   Close(srcfd);
+  // ssize_t rio_writen(int fd, void *usrbuf, size_t n)
   Rio_writen(fd, srcp, filesize);
-  Munmap(srcp, filesize);
+
+  free(srcp);
+  
+  /* Original verison
+    srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+    Close(srcfd);
+    Rio_writen(fd, srcp, filesize);
+    Munmap(srcp, filesize);
+  */
 }
 
 void serve_dynamic(int fd, char *filename, char *cgiargs){
