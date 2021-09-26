@@ -14,16 +14,16 @@ int main(void) {
     // strchr(str, character) : returns a pointer to the first occurence of 'character' in 'str'
     p = strchr(buf, '&'); 
     *p = '\0';
-    strcpy(arg1, buf);
-    strcpy(arg2, p+1);
+    strcpy(arg1, buf);     // arg1 : first=12
+    strcpy(arg2, p+1);     // arg2 : second=23
     // atoi : converts a character into an integer
     // n1 = atoi(arg1); 
     // n2 = atoi(arg2);
-    // n1 = atoi(strchr(arg1,'=')+1); 
-    // n2 = atoi(strchr(arg2,'=')+1);
+    n1 = atoi(strchr(arg1,'=')+1);  //12 
+    n2 = atoi(strchr(arg2,'=')+1);  //23
     // 수빈이 방법
-    sscanf(buf, "first=%d", &n1);
-    sscanf(p + 1, "second=%d", &n2);
+    // sscanf(buf, "first=%d", &n1);
+    // sscanf(p + 1, "second=%d", &n2);
   }
 
   /*
@@ -37,6 +37,7 @@ int main(void) {
   sprintf(content, "QUERY_STRING=%s", buf);
   sprintf(content, "Welcome to add.com: ");
   sprintf(content, "%sTHE Internet addition portal.\r\n<p>", content);
+  // sprintf(content, "%sThe answer is: %s + %s = args\r\n<p>", content, arg1, arg2);
   sprintf(content, "%sThe answer is: %d + %d = %d\r\n<p>", content, n1,n2,n1+n2);
   sprintf(content, "%sThanks for visiting!\r\n", content);
 

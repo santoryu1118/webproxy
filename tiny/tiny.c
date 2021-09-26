@@ -8,14 +8,22 @@
  */
 #include "csapp.h"
 
+// HTTP transaction 한개 실행하는 function
 void doit(int fd);
+// Tiny는 요청 헤더 내의 어떤 정보도 사용하지 않기 때문에 이들을 읽고 무시하는 함수
 void read_requesthdrs(rio_t *rp);
+// URI를 domian, path, cgiargs로 나누는 함수
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
+// filetype 가져오는 함수
 void get_filetype(char *filename, char *filetype);
+// 정적 컨텐츠 처리하는 함수
+void serve_static(int fd, char *filename, int filesize);
+// 동적 컨텐츠 처리하는 함수
 void serve_dynamic(int fd, char *filename, char *cgiargs);
+//HTTP 에러 메세지 보내는 함수
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
+
 
 int main(int argc, char **argv) {
   int listenfd, connfd;
@@ -89,7 +97,7 @@ void doit(int fd){
 
   // static(정적) 컨텐츠라면
   if (is_static){
-    // 보통 파일이라는 것과 읽기 권한을 가지고 있는지 확인
+    // 보통 파일이라는 것과 읽기 권한을 가지고 있는지 확인, stat함수가 해줬던 거
     if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)){
       clienterror(fd, filename, "403", "Forbidden", 
                   "Tiny couldn't read the file");
@@ -215,12 +223,13 @@ void serve_static(int fd, char *filename, int filesize){
   srcfd = Open(filename, O_RDONLY, 0);
   srcp = malloc(filesize);
 
-  // ssize_t rio_read(int fd, void *usrbuf, size_t n)
+  // ssize_t rio_readn(int fd, void *usrbuf, size_t n)
+  // send file content to virtual memory
   Rio_readn(srcfd, srcp, filesize);
   Close(srcfd);
+
   // ssize_t rio_writen(int fd, void *usrbuf, size_t n)
   Rio_writen(fd, srcp, filesize);
-
   free(srcp);
   
   /* Original verison
@@ -240,12 +249,16 @@ void serve_dynamic(int fd, char *filename, char *cgiargs){
   sprintf(buf, "Server: Tiny Web Server\r\n");
   Rio_writen(fd, buf, strlen(buf));
 
+  // 자식 프로세스 만듬
   if (Fork() == 0){
+    //setenv(const char* name, const char* value, int overwrite)
     setenv("QUERY_STRING", cgiargs, 1);
     // redirect stdout to client
     Dup2(fd, STDOUT_FILENO);  
     // run CGI program
+    // 부모와 자식이 다른 작업하면서 둘 다 살아있게 하기 위해 사용
     Execve(filename, emptylist, environ);
   }
+  // 자식 프로세스가 올바르게 종료되는걸 기다림
   Wait(NULL);
 }
